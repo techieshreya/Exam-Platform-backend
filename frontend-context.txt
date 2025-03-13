@@ -1,0 +1,191 @@
+Frontend Context Documentation for Backend Integration
+
+1. Authentication Types
+======================
+
+```typescript
+interface User {
+  id: string;
+  email: string;
+  username: string;
+}
+
+interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+interface RegisterCredentials extends LoginCredentials {
+  username: string;
+}
+
+interface AuthResponse {
+  user: User;
+  token: string;
+}
+```
+
+2. Exam Types
+============
+
+```typescript
+interface Question {
+  id: string;
+  text: string;
+  options: {
+    id: string;
+    text: string;
+  }[];
+  correctAnswer: string;
+}
+
+interface Exam {
+  id: string;
+  title: string;
+  description: string;
+  duration: number; // in minutes
+  questions: Question[];
+  startTime: string;
+  endTime: string;
+}
+
+interface ExamSession {
+  id: string;
+  examId: string;
+  userId: string;
+  startTime: string;
+  endTime: string | null;
+  answers: {
+    questionId: string;
+    selectedOptionId: string;
+  }[];
+  completed: boolean;
+}
+```
+
+3. Required API Endpoints
+=======================
+
+Authentication Endpoints:
+-----------------------
+POST /api/auth/register
+- Request: RegisterCredentials
+- Response: AuthResponse
+- Purpose: Create new user account
+
+POST /api/auth/login
+- Request: LoginCredentials
+- Response: AuthResponse
+- Purpose: Authenticate user
+
+POST /api/auth/logout
+- Request: No body (uses Authorization header)
+- Response: 200 OK
+- Purpose: Invalidate user session
+
+GET /api/auth/me
+- Request: No body (uses Authorization header)
+- Response: AuthResponse
+- Purpose: Get current user data
+
+Exam Endpoints:
+--------------
+GET /api/exams
+- Request: No body (uses Authorization header)
+- Response: Exam[]
+- Purpose: Get list of available exams
+
+GET /api/exams/:examId
+- Request: No body (uses Authorization header)
+- Response: Exam
+- Purpose: Get detailed exam information
+
+POST /api/exams/:examId/start
+- Request: No body (uses Authorization header)
+- Response: ExamSession
+- Purpose: Start an exam session
+
+POST /api/exams/:examId/submit
+- Request: { answers: { questionId: string; selectedOptionId: string; }[] }
+- Response: void
+- Purpose: Submit exam answers
+
+GET /api/exams/:examId/results
+- Request: No body (uses Authorization header)
+- Response: {
+    score: number;
+    totalQuestions: number;
+    correctAnswers: number;
+    incorrectAnswers: number;
+  }
+- Purpose: Get individual exam results
+
+GET /api/exams/results
+- Request: No body (uses Authorization header)
+- Response: {
+    examId: string;
+    examTitle: string;
+    score: number;
+    totalQuestions: number;
+    completedAt: string;
+  }[]
+- Purpose: Get all exam results for user
+
+4. Authentication Flow
+=====================
+1. User registers/logs in -> receives JWT token
+2. Token is stored in localStorage
+3. Token is included in Authorization header for all subsequent requests
+4. On 401 response, user is redirected to login
+5. On logout, token is removed and user is redirected to login
+
+5. Exam Flow
+===========
+1. User views available exams on dashboard
+2. User starts exam:
+   a. Frontend checks for Safe Exam Browser
+   b. Backend creates exam session
+   c. Frontend navigates to exam page
+3. During exam:
+   a. Questions are displayed one at a time
+   b. Answers are stored locally until submission
+   c. User can navigate between questions
+4. On exam submit:
+   a. All answers are sent to backend
+   b. User is redirected to dashboard
+   c. Results are immediately available
+
+6. Security Requirements
+=======================
+1. All endpoints except login/register require JWT authentication
+2. Exam endpoints should validate:
+   - User is authenticated
+   - Exam exists and is available
+   - Exam hasn't already been completed by user
+   - Exam is being taken within scheduled time
+   - Request is coming from Safe Exam Browser
+3. Frontend prevents:
+   - Taking exam outside Safe Exam Browser
+   - Navigating away from exam page
+   - Multiple submissions of same exam
+
+7. Expected Response Formats
+===========================
+Success Response:
+{
+  "data": T, // where T is the expected response type
+  "message": string // optional success message
+}
+
+Error Response:
+{
+  "error": {
+    "code": string,
+    "message": string,
+    "details"?: any
+  }
+}
+
+8. Required Environment Variables
+===============================
+BACKEND_URL=http://localhost:3000 (configurable)

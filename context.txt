@@ -1,0 +1,68 @@
+src/routes/exams.ts:
+  - GET /: Get all available exams
+    - Authentication: Required
+    - Returns:
+      - 200: { data: availableExams }
+      - 500: { error: { code: 'SERVER_ERROR', message: 'Error fetching exams' } }
+  - GET /:examId: Get exam by ID
+    - Authentication: Required
+    - Returns:
+      - 200: { data: { ...exam[0], questions: Array.from(questionMap.values()) } }
+      - 404: { error: { code: 'NOT_FOUND', message: 'Exam not found' } }
+      - 500: { error: { code: 'SERVER_ERROR', message: 'Error fetching exam details' } }
+  - POST /:examId/start: Start exam session
+    - Authentication: Required
+    - Returns:
+      - 201: { data: session }
+      - 400: { error: { code: 'INVALID_TIME', message: 'Exam is not available at this time' } }
+      - 400: { error: { code: 'SESSION_EXISTS', message: 'Active exam session already exists' } }
+      - 404: { error: { code: 'NOT_FOUND', message: 'Exam not found' } }
+      - 500: { error: { code: 'SERVER_ERROR', message: 'Error starting exam session' } }
+  - POST /:examId/submit: Submit exam
+    - Authentication: Required
+    - Body: { answers: Array<{ questionId: string; selectedOptionId: string }> }
+    - Returns:
+      - 200: { data: { message: 'Exam submitted successfully' } }
+      - 404: { error: { code: 'SESSION_NOT_FOUND', message: 'No active exam session found' } }
+      - 500: { error: { code: 'SERVER_ERROR', message: 'Error submitting exam' } }
+  - GET /:examId/results: Get exam results
+    - Authentication: Required
+    - Returns:
+      - 200: { data: { score: (correctAnswers / examQuestions.length) * 100, totalQuestions: examQuestions.length, correctAnswers, incorrectAnswers: examQuestions.length - correctAnswers } }
+      - 404: { error: { code: 'RESULTS_NOT_FOUND', message: 'No completed exam session found' } }
+      - 500: { error: { code: 'SERVER_ERROR', message: 'Error fetching exam results' } }
+  - GET /results: Get all exam results for user
+    - Authentication: Required
+    - Returns:
+      - 200: { data: results }
+      - 500: { error: { code: 'SERVER_ERROR', message: 'Error fetching exam results' } }
+
+src/routes/auth.ts:
+  - POST /register: Register
+    - Body: { email, password, username }
+    - Returns:
+      - 201: { data: { user: { id, email, username }, token } }
+      - 400: { error: { code: 'VALIDATION_ERROR', message: 'Email, password, and username are required' } }
+      - 400: { error: { code: 'USER_EXISTS', message: 'User already exists with this email' } }
+      - 500: { error: { code: 'SERVER_ERROR', message: 'Error creating user' } }
+  - POST /login: Login
+    - Body: { email, password }
+    - Returns:
+      - 200: { data: { user: { id, email, username }, token } }
+      - 400: { error: { code: 'VALIDATION_ERROR', message: 'Email and password are required' } }
+      - 401: { error: { code: 'AUTH_ERROR', message: 'Invalid credentials' } }
+      - 500: { error: { code: 'SERVER_ERROR', message: 'Error logging in' } }
+  - GET /me: Get current user
+    - Authentication: Required
+    - Returns:
+      - 200: { data: { user } }
+  - POST /logout: Logout (just for API completeness - actual logout happens on frontend)
+    - Authentication: Required
+    - Returns:
+      - 200: { data: { message: 'Logged out successfully' } }
+
+src/routes/admin.ts:
+  - POST /create-sample-exam: Create sample exam
+    - Returns:
+      - 201: { data: { message: 'Sample exam created successfully', exam: { id, title, description, duration } } }
+      - 500: { error: { code: 'SERVER_ERROR', message: 'Error creating sample exam' } }
