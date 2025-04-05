@@ -213,12 +213,7 @@ router.post('/:examId/start', auth, (async (req: AuthRequest, res: Response) => 
       .limit(1);
 
     if (existingSession[0]) {
-      return res.status(400).json({
-        error: {
-          code: 'SESSION_EXISTS',
-          message: 'Active exam session already exists',
-        },
-      });
+      return res.json({ data: existingSession[0] });
     }
 
     // Create new session
