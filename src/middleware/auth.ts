@@ -28,6 +28,8 @@ export const auth = async (req: AuthRequest, res: Response, next: NextFunction) 
       id: user[0].id,
       email: user[0].email,
       username: user[0].username,
+      name: user[0].username,
+      isAdmin: false,
     };
 
     next();

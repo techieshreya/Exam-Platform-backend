@@ -1,0 +1,259 @@
+# Admin API Documentation
+
+## Authentication
+
+### Register Admin
+POST /api/admin/register
+Request:
+```json
+{
+  "email": "admin@example.com",
+  "password": "password123",
+  "name": "Admin Name"
+}
+```
+Response:
+```json
+{
+  "data": {
+    "admin": {
+      "id": "uuid",
+      "email": "admin@example.com",
+      "name": "Admin Name"
+    },
+    "token": "jwt_token"
+  }
+}
+```
+
+### Login
+POST /api/admin/login
+Request:
+```json
+{
+  "email": "admin@example.com",
+  "password": "password123"
+}
+```
+Response:
+```json
+{
+  "data": {
+    "admin": {
+      "id": "uuid",
+      "email": "admin@example.com",
+      "name": "Admin Name"
+    },
+    "token": "jwt_token"
+  }
+}
+```
+
+## Exam Management
+
+### List All Exams
+GET /api/admin/exams
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "title": "Example Exam",
+      "description": "Exam description",
+      "duration": 60,
+      "startTime": "2024-04-07T14:00:00Z",
+      "endTime": "2024-04-07T15:00:00Z",
+      "createdAt": "2024-04-07T13:00:00Z"
+    }
+  ]
+}
+```
+
+### Create Exam
+POST /api/admin/exams
+Request:
+```json
+{
+  "title": "Example Exam",
+  "description": "Exam description",
+  "duration": 60,
+  "startTime": "2024-04-07T14:00:00Z",
+  "endTime": "2024-04-07T15:00:00Z",
+  "questions": [
+    {
+      "text": "Question text",
+      "options": [
+        {
+          "text": "Option 1",
+          "correct": true
+        },
+        {
+          "text": "Option 2",
+          "correct": false
+        }
+      ]
+    }
+  ]
+}
+```
+Response:
+```json
+{
+  "data": {
+    "message": "Exam created successfully",
+    "exam": {
+      "id": "uuid",
+      "title": "Example Exam",
+      "description": "Exam description",
+      "duration": 60,
+      "startTime": "2024-04-07T14:00:00Z",
+      "endTime": "2024-04-07T15:00:00Z",
+      "createdAt": "2024-04-07T13:00:00Z"
+    }
+  }
+}
+```
+
+### Get Exam Details
+GET /api/admin/exams/:examId
+Response:
+```json
+{
+  "data": {
+    "id": "uuid",
+    "title": "Example Exam",
+    "description": "Exam description",
+    "duration": 60,
+    "startTime": "2024-04-07T14:00:00Z",
+    "endTime": "2024-04-07T15:00:00Z",
+    "createdAt": "2024-04-07T13:00:00Z",
+    "questions": [
+      {
+        "id": "uuid",
+        "text": "Question text",
+        "options": [
+          {
+            "id": "uuid",
+            "text": "Option 1",
+            "correct": true
+          },
+          {
+            "id": "uuid",
+            "text": "Option 2",
+            "correct": false
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Get Exam Results
+GET /api/admin/exams/:examId/results
+Response:
+```json
+{
+  "data": [
+    {
+      "sessionId": "uuid",
+      "startTime": "2024-04-07T14:00:00Z",
+      "endTime": "2024-04-07T14:30:00Z",
+      "completed": true,
+      "userId": "uuid",
+      "userEmail": "user@example.com",
+      "username": "User Name",
+      "score": 80,
+      "totalQuestions": 10,
+      "answers": [
+        {
+          "questionId": "uuid",
+          "selectedOptionId": "uuid",
+          "selectedOptionText": "Selected answer",
+          "isCorrect": true
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Delete Exam
+DELETE /api/admin/exams/:examId
+Response:
+```json
+{
+  "data": {
+    "message": "Exam deleted successfully"
+  }
+}
+```
+
+## User Management
+
+### List All Users
+GET /api/admin/users
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "email": "user@example.com",
+      "username": "User Name",
+      "createdAt": "2024-04-07T13:00:00Z"
+    }
+  ]
+}
+```
+
+# Error Responses
+
+All endpoints may return the following error responses:
+
+### Validation Error
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Error message"
+  }
+}
+```
+
+### Authorization Error
+```json
+{
+  "error": {
+    "code": "AUTH_ERROR",
+    "message": "Error message"
+  }
+}
+```
+
+### Not Found Error
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Error message"
+  }
+}
+```
+
+### Server Error
+```json
+{
+  "error": {
+    "code": "SERVER_ERROR",
+    "message": "Error message"
+  }
+}
+```
+
+# Authentication
+
+All admin endpoints (except login/register) require authentication via Bearer token:
+```
+Authorization: Bearer <jwt_token>

@@ -1,104 +1,414 @@
-import { Router, Response } from 'express';
+import { Router, Response, RequestHandler } from 'express';
 import { db } from '../db/index.js';
-import { exams, questions, questionOptions } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
-import { auth } from '../middleware/auth.js';
+import { admins, exams, questions, questionOptions, examSessions, users, examAnswers } from '../db/schema.js';
+import { eq, and, desc, inArray } from 'drizzle-orm';
+import { adminAuth } from '../middleware/admin-auth.js';
 import { AuthRequest } from '../types/express.js';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 
 const router = Router();
 
-export const sampleQuiz = {
-  title: "Sample Programming Quiz",
-  description: "A basic quiz about programming concepts",
-  duration: 30, // 30 minutes
-  questions: [
-    {
-      text: "What is TypeScript?",
-      options: [
-        { text: "A JavaScript framework", correct: false },
-        { text: "A superset of JavaScript with static typing", correct: true },
-        { text: "A new programming language", correct: false },
-        { text: "A JavaScript runtime", correct: false },
-      ],
-    },
-    {
-      text: "What does REST stand for?",
-      options: [
-        { text: "React Express Server Time", correct: false },
-        { text: "Representational State Transfer", correct: true },
-        { text: "Remote Endpoint Service Transfer", correct: false },
-        { text: "Regular Expression State Test", correct: false },
-      ],
-    },
-    {
-      text: "Which of these is NOT a JavaScript data type?",
-      options: [
-        { text: "undefined", correct: false },
-        { text: "boolean", correct: false },
-        { text: "string", correct: false },
-        { text: "integer", correct: true },
-      ],
-    },
-  ],
-};
+// Admin Authentication Routes
 
-router.post('/create-sample-exam', async (req: AuthRequest, res: Response) => {
+router.post('/register', (async (req: AuthRequest, res: Response) => {
   try {
-    // Create an exam
+    const { email, password, name } = req.body;
+
+    // Validate input
+    if (!email || !password || !name) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Email, password, and name are required',
+        },
+      });
+    }
+
+    // Check if admin exists
+    const existingAdmin = await db.select().from(admins).where(eq(admins.email, email)).limit(1);
+    if (existingAdmin[0]) {
+      return res.status(400).json({
+        error: {
+          code: 'ADMIN_EXISTS',
+          message: 'Admin already exists with this email',
+        },
+      });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create admin
+    const [newAdmin] = await db.insert(admins).values({
+      email,
+      name,
+      password: hashedPassword,
+    }).returning();
+
+    // Generate JWT
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET not configured');
+    }
+
+    const token = jwt.sign({ id: newAdmin.id }, process.env.JWT_SECRET, {
+      expiresIn: '7d',
+    });
+
+    res.status(201).json({
+      data: {
+        admin: {
+          id: newAdmin.id,
+          email: newAdmin.email,
+          name: newAdmin.name,
+        },
+        token,
+      },
+    });
+  } catch (error) {
+    console.error('Admin register error:', error);
+    res.status(500).json({
+      error: {
+        code: 'SERVER_ERROR',
+        message: 'Error creating admin',
+      },
+    });
+  }
+}) as unknown as RequestHandler);
+
+router.post('/login', (async (req: AuthRequest, res: Response) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Email and password are required',
+        },
+      });
+    }
+
+    // Find admin
+    const admin = await db.select().from(admins).where(eq(admins.email, email)).limit(1);
+    if (!admin[0]) {
+      return res.status(401).json({
+        error: {
+          code: 'AUTH_ERROR',
+          message: 'Invalid credentials',
+        },
+      });
+    }
+
+    // Check password
+    const isValidPassword = await bcrypt.compare(password, admin[0].password);
+    if (!isValidPassword) {
+      return res.status(401).json({
+        error: {
+          code: 'AUTH_ERROR',
+          message: 'Invalid credentials',
+        },
+      });
+    }
+
+    // Generate JWT
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET not configured');
+    }
+
+    const token = jwt.sign({ id: admin[0].id }, process.env.JWT_SECRET, {
+      expiresIn: '7d',
+    });
+
+    res.json({
+      data: {
+        admin: {
+          id: admin[0].id,
+          email: admin[0].email,
+          name: admin[0].name,
+        },
+        token,
+      },
+    });
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({
+      error: {
+        code: 'SERVER_ERROR',
+        message: 'Error logging in',
+      },
+    });
+  }
+}) as unknown as RequestHandler);
+
+// Protected Admin Routes
+
+// Get all exams
+router.get('/exams', adminAuth, (async (req: AuthRequest, res: Response) => {
+  try {
+    const allExams = await db.select().from(exams).orderBy(desc(exams.createdAt));
+    res.json({ data: allExams });
+  } catch (error) {
+    console.error('Get all exams error:', error);
+    res.status(500).json({
+      error: {
+        code: 'SERVER_ERROR',
+        message: 'Error fetching exams',
+      },
+    });
+  }
+}) as unknown as RequestHandler);
+
+// Create exam
+router.post('/exams', adminAuth, (async (req: AuthRequest, res: Response) => {
+  try {
+    const { title, description, duration, startTime, endTime, questions: questionsList } = req.body;
+
+    // Validate input
+    if (!title || !description || !duration || !startTime || !endTime || !questionsList?.length) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'All fields are required and exam must have at least one question',
+        },
+      });
+    }
+
+    // Create exam
     const [exam] = await db.insert(exams).values({
-      title: sampleQuiz.title,
-      description: sampleQuiz.description,
-      duration: sampleQuiz.duration,
-      startTime: new Date(), // Starts now
-      endTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Ends in 7 days
+      title,
+      description,
+      duration,
+      startTime: new Date(startTime),
+      endTime: new Date(endTime),
     }).returning();
 
     // Create questions and their options
-    for (const questionData of sampleQuiz.questions) {
-      // Create question first
+    for (const questionData of questionsList) {
       const [question] = await db.insert(questions).values({
         examId: exam.id,
         text: questionData.text,
       }).returning();
 
-      // Create options for the question
       const createdOptions = await Promise.all(
-        questionData.options.map(async (option) => {
+        questionData.options.map(async (option: { text: string; correct: boolean }) => {
           const [createdOption] = await db.insert(questionOptions).values({
             questionId: question.id,
             text: option.text,
           }).returning();
-          return createdOption;
+          return { ...createdOption, correct: option.correct };
         })
       );
 
       // Update question with correct option
-      const correctOption = createdOptions[questionData.options.findIndex(opt => opt.correct)];
-      await db.update(questions)
-        .set({ correctOptionId: correctOption.id })
-        .where(eq(questions.id, question.id));
+      const correctOption = createdOptions.find(opt => opt.correct);
+      if (correctOption) {
+        await db.update(questions)
+          .set({ correctOptionId: correctOption.id })
+          .where(eq(questions.id, question.id));
+      }
     }
 
     res.status(201).json({
       data: {
-        message: 'Sample exam created successfully',
-        exam: {
-          id: exam.id,
-          title: exam.title,
-          description: exam.description,
-          duration: exam.duration,
-        },
+        message: 'Exam created successfully',
+        exam,
       },
     });
   } catch (error) {
-    console.error('Error creating sample exam:', error);
+    console.error('Create exam error:', error);
     res.status(500).json({
       error: {
         code: 'SERVER_ERROR',
-        message: 'Error creating sample exam',
+        message: 'Error creating exam',
       },
     });
   }
-});
+}) as unknown as RequestHandler);
+
+// Get exam details with questions and options
+router.get('/exams/:examId', adminAuth, (async (req: AuthRequest, res: Response) => {
+  try {
+    const { examId } = req.params;
+    const exam = await db.select().from(exams).where(eq(exams.id, examId)).limit(1);
+
+    if (!exam[0]) {
+      return res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Exam not found',
+        },
+      });
+    }
+
+    const examQuestions = await db.select().from(questions)
+      .where(eq(questions.examId, examId));
+
+    const questionIds = examQuestions.map(q => q.id);
+    const options = await db.select().from(questionOptions)
+      .where(inArray(questionOptions.questionId, questionIds));
+
+    // Group options by question
+    const questionMap = new Map();
+    examQuestions.forEach(question => {
+      questionMap.set(question.id, {
+        ...question,
+        options: [],
+      });
+    });
+
+    options.forEach(option => {
+      const question = questionMap.get(option.questionId);
+      if (question) {
+        question.options.push({
+          id: option.id,
+          text: option.text,
+          correct: option.id === question.correctOptionId,
+        });
+      }
+    });
+
+    res.json({
+      data: {
+        ...exam[0],
+        questions: Array.from(questionMap.values()),
+      },
+    });
+  } catch (error) {
+    console.error('Get exam details error:', error);
+    res.status(500).json({
+      error: {
+        code: 'SERVER_ERROR',
+        message: 'Error fetching exam details',
+      },
+    });
+  }
+}) as unknown as RequestHandler);
+
+// Get exam results with user details
+router.get('/exams/:examId/results', adminAuth, (async (req: AuthRequest, res: Response) => {
+  try {
+    const { examId } = req.params;
+    
+    const sessions = await db.select({
+      sessionId: examSessions.id,
+      startTime: examSessions.startTime,
+      endTime: examSessions.endTime,
+      completed: examSessions.completed,
+      userId: users.id,
+      userEmail: users.email,
+      username: users.username,
+    })
+    .from(examSessions)
+    .leftJoin(users, eq(examSessions.userId, users.id))
+    .where(eq(examSessions.examId, examId));
+
+    // Get all questions for this exam
+    const examQuestions = await db.select().from(questions)
+      .where(eq(questions.examId, examId));
+
+    const results = await Promise.all(
+      sessions.map(async (session) => {
+        if (!session.completed) {
+          return {
+            ...session,
+            score: null,
+            totalQuestions: examQuestions.length,
+            answers: [],
+          };
+        }
+
+        const answers = await db.select().from(examAnswers)
+          .where(eq(examAnswers.sessionId, session.sessionId));
+
+        let correctAnswers = 0;
+        const answersWithDetails = await Promise.all(
+          answers.map(async (answer) => {
+            const question = examQuestions.find(q => q.id === answer.questionId);
+            const isCorrect = question?.correctOptionId === answer.selectedOptionId;
+            if (isCorrect) correctAnswers++;
+
+            // Get selected option text
+            const [selectedOption] = await db.select()
+              .from(questionOptions)
+              .where(eq(questionOptions.id, answer.selectedOptionId))
+              .limit(1);
+
+            return {
+              questionId: answer.questionId,
+              selectedOptionId: answer.selectedOptionId,
+              selectedOptionText: selectedOption?.text,
+              isCorrect,
+            };
+          })
+        );
+
+        return {
+          ...session,
+          score: (correctAnswers / examQuestions.length) * 100,
+          totalQuestions: examQuestions.length,
+          answers: answersWithDetails,
+        };
+      })
+    );
+
+    res.json({ data: results });
+  } catch (error) {
+    console.error('Get exam results error:', error);
+    res.status(500).json({
+      error: {
+        code: 'SERVER_ERROR',
+        message: 'Error fetching exam results',
+      },
+    });
+  }
+}) as unknown as RequestHandler);
+
+// Delete exam
+router.delete('/exams/:examId', adminAuth, (async (req: AuthRequest, res: Response) => {
+  try {
+    const { examId } = req.params;
+
+    // Delete exam (cascading will handle related records)
+    await db.delete(exams).where(eq(exams.id, examId));
+
+    res.json({
+      data: {
+        message: 'Exam deleted successfully',
+      },
+    });
+  } catch (error) {
+    console.error('Delete exam error:', error);
+    res.status(500).json({
+      error: {
+        code: 'SERVER_ERROR',
+        message: 'Error deleting exam',
+      },
+    });
+  }
+}) as unknown as RequestHandler);
+
+// Get all users
+router.get('/users', adminAuth, (async (req: AuthRequest, res: Response) => {
+  try {
+    const allUsers = await db.select({
+      id: users.id,
+      email: users.email,
+      username: users.username,
+      createdAt: users.createdAt,
+    }).from(users).orderBy(desc(users.createdAt));
+
+    res.json({ data: allUsers });
+  } catch (error) {
+    console.error('Get all users error:', error);
+    res.status(500).json({
+      error: {
+        code: 'SERVER_ERROR',
+        message: 'Error fetching users',
+      },
+    });
+  }
+}) as unknown as RequestHandler);
 
 export default router;

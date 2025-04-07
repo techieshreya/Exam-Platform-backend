@@ -1,6 +1,15 @@
 import { pgTable, text, timestamp, boolean, integer, uuid, pgEnum } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
+// Admins table
+export const admins = pgTable('admins', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  email: text('email').unique().notNull(),
+  password: text('password').notNull(), // Will be hashed
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
 // Users table
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
