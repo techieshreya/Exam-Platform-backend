@@ -2,30 +2,6 @@
 
 ## Authentication
 
-### Register Admin
-POST /api/admin/register
-Request:
-```json
-{
-  "email": "admin@example.com",
-  "password": "password123",
-  "name": "Admin Name"
-}
-```
-Response:
-```json
-{
-  "data": {
-    "admin": {
-      "id": "uuid",
-      "email": "admin@example.com",
-      "name": "Admin Name"
-    },
-    "token": "jwt_token"
-  }
-}
-```
-
 ### Login
 POST /api/admin/login
 Request:

@@ -38,13 +38,6 @@ src/routes/exams.ts:
       - 500: { error: { code: 'SERVER_ERROR', message: 'Error fetching exam results' } }
 
 src/routes/auth.ts:
-  - POST /register: Register
-    - Body: { email, password, username }
-    - Returns:
-      - 201: { data: { user: { id, email, username }, token } }
-      - 400: { error: { code: 'VALIDATION_ERROR', message: 'Email, password, and username are required' } }
-      - 400: { error: { code: 'USER_EXISTS', message: 'User already exists with this email' } }
-      - 500: { error: { code: 'SERVER_ERROR', message: 'Error creating user' } }
   - POST /login: Login
     - Body: { email, password }
     - Returns:
