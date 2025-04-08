@@ -6,6 +6,7 @@ import { adminAuth } from '../middleware/admin-auth.js';
 import { AuthRequest } from '../types/express.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { sendWelcomeEmail } from '../utils/email.js'; // Import the email utility
 
 const router = Router();
 
@@ -530,6 +531,7 @@ router.post('/users/bulk', adminAuth, (async (req: AuthRequest, res: Response) =
     const usersToInsert: (typeof users.$inferInsert)[] = [];
     const errors: { email: string; reason: string }[] = [];
     const existingEmails = new Set<string>();
+    const plainTextPasswords = new Map<string, string>(); // To store plain text passwords temporarily
 
     // Fetch existing emails to avoid duplicates efficiently
     const allExistingUsers = await db.select({ email: users.email }).from(users);
@@ -549,6 +551,9 @@ router.post('/users/bulk', adminAuth, (async (req: AuthRequest, res: Response) =
         errors.push({ email: email, reason: 'Email already exists' });
         continue;
       }
+
+      // Store plain text password before hashing
+      plainTextPasswords.set(email, password);
 
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -573,6 +578,25 @@ router.post('/users/bulk', adminAuth, (async (req: AuthRequest, res: Response) =
         createdAt: users.createdAt,
       });
     }
+
+    // Send welcome emails for successfully created users
+    for (const createdUser of createdUsers) {
+      const plainPassword = plainTextPasswords.get(createdUser.email);
+      if (plainPassword) {
+        // Send email asynchronously - don't block the response for email sending
+        sendWelcomeEmail({
+          to: createdUser.email,
+          username: createdUser.username,
+          passwordPlainText: plainPassword,
+        }).catch(emailError => {
+          // Log email sending errors separately, but don't fail the API request
+          console.error(`Failed to send welcome email to ${createdUser.email}:`, emailError);
+        });
+      } else {
+         console.error(`Could not find plain text password for created user ${createdUser.email} to send welcome email.`);
+      }
+    }
+
 
     res.status(201).json({
       data: {
