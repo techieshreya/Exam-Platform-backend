@@ -380,16 +380,33 @@ router.delete('/exams/:examId', adminAuth, (async (req: AuthRequest, res: Respon
       if (sessionsToDelete.length > 0) {
         const sessionIds = sessionsToDelete.map(s => s.id);
 
-        // 2. Delete related exam answers
+        // 2. Delete related exam answers (dependent on sessions)
         await tx.delete(examAnswers)
           .where(inArray(examAnswers.sessionId, sessionIds));
 
-        // 3. Delete related exam sessions
+        // 3. Delete related exam sessions (dependent on exam)
         await tx.delete(examSessions)
           .where(eq(examSessions.examId, examId));
       }
 
-      // 4. Delete the exam itself
+      // 4. Find related questions
+      const questionsToDelete = await tx.select({ id: questions.id })
+        .from(questions)
+        .where(eq(questions.examId, examId));
+
+      if (questionsToDelete.length > 0) {
+        const questionIds = questionsToDelete.map(q => q.id);
+
+        // 5. Delete related question options (dependent on questions)
+        await tx.delete(questionOptions)
+          .where(inArray(questionOptions.questionId, questionIds));
+
+        // 6. Delete related questions (dependent on exam)
+        await tx.delete(questions)
+          .where(eq(questions.examId, examId));
+      }
+
+      // 7. Delete the exam itself
       const deleteResult = await tx.delete(exams).where(eq(exams.id, examId)).returning();
 
       if (deleteResult.length === 0) {
