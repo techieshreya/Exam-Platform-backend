@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 
 // Basic validation for required environment variables
-const requiredEnvVars = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'EMAIL_FROM'];
+const requiredEnvVars = ['EMAIL', 'PASSWORD'];
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
     console.error(`Email configuration error: Missing environment variable ${envVar}`);
@@ -11,19 +11,11 @@ for (const envVar of requiredEnvVars) {
 }
 
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || '587', 10),
-  // secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports (like 587)
-  // For Gmail on port 587, secure should be false as Nodemailer uses STARTTLS
-  secure: false, 
+  service: 'gmail',
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: process.env.EMAIL,
+    pass: process.env.PASSWORD,
   },
-  // Add TLS configuration for stricter environments if needed
-  // tls: {
-  //   ciphers:'SSLv3'
-  // }
 });
 
 interface SendWelcomeEmailArgs {
@@ -59,7 +51,7 @@ export const sendWelcomeEmail = async ({ to, username, passwordPlainText }: Send
   `;
 
   const mailOptions = {
-    from: `"Unisphere Admin" <${process.env.EMAIL_FROM}>`, // Sender address
+    from: `"Unisphere Admin" <${process.env.EMAIL}>`, // Sender address
     to: to, // List of receivers
     subject: subject, // Subject line
     text: textBody, // Plain text body
