@@ -370,20 +370,56 @@ router.delete('/exams/:examId', adminAuth, (async (req: AuthRequest, res: Respon
   try {
     const { examId } = req.params;
 
-    // Delete exam (cascading will handle related records)
-    await db.delete(exams).where(eq(exams.id, examId));
+    // Use a transaction to ensure atomicity
+    await db.transaction(async (tx) => {
+      // 1. Find related exam sessions
+      const sessionsToDelete = await tx.select({ id: examSessions.id })
+        .from(examSessions)
+        .where(eq(examSessions.examId, examId));
+
+      if (sessionsToDelete.length > 0) {
+        const sessionIds = sessionsToDelete.map(s => s.id);
+
+        // 2. Delete related exam answers
+        await tx.delete(examAnswers)
+          .where(inArray(examAnswers.sessionId, sessionIds));
+
+        // 3. Delete related exam sessions
+        await tx.delete(examSessions)
+          .where(eq(examSessions.examId, examId));
+      }
+
+      // 4. Delete the exam itself
+      const deleteResult = await tx.delete(exams).where(eq(exams.id, examId)).returning();
+
+      if (deleteResult.length === 0) {
+        // If the exam wasn't found (maybe deleted in another request)
+        // Rollback transaction by throwing an error
+        throw new Error('Exam not found'); 
+      }
+    });
 
     res.json({
       data: {
         message: 'Exam deleted successfully',
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Delete exam error:', error);
+    // Check if it was the 'Exam not found' error we threw
+    if (error.message === 'Exam not found') {
+      return res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Exam not found or already deleted',
+        },
+      });
+    }
+    // Handle potential database errors during transaction
     res.status(500).json({
       error: {
         code: 'SERVER_ERROR',
-        message: 'Error deleting exam',
+        message: 'Error deleting exam and its related data',
       },
     });
   }
