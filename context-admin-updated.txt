@@ -179,6 +179,75 @@ Response:
 }
 ```
 
+### Get Specific Student Exam Result
+GET /api/admin/exams/:examId/results/:userId
+Response (Success - Completed Session):
+```json
+{
+  "data": {
+    "sessionId": "uuid",
+    "startTime": "2024-04-08T10:00:00Z",
+    "endTime": "2024-04-08T10:45:12Z",
+    "completed": true,
+    "userId": "user-uuid",
+    "userEmail": "student@example.com",
+    "username": "Student Name",
+    "score": 80.00,
+    "totalQuestions": 5,
+    "correctAnswers": 4,
+    "answers": [
+      {
+        "questionId": "q-uuid-1",
+        "questionText": "What is 2+2?",
+        "selectedOptionId": "opt-uuid-1a",
+        "selectedOptionText": "4",
+        "correctOptionId": "opt-uuid-1a",
+        "correctOptionText": "4",
+        "isCorrect": true
+      },
+      {
+        "questionId": "q-uuid-2",
+        "questionText": "Capital of France?",
+        "selectedOptionId": "opt-uuid-2b",
+        "selectedOptionText": "London",
+        "correctOptionId": "opt-uuid-2a",
+        "correctOptionText": "Paris",
+        "isCorrect": false
+      }
+      // ... more answers
+    ]
+  }
+}
+```
+Response (Success - Incomplete Session):
+```json
+{
+  "data": {
+    "sessionId": "uuid",
+    "startTime": "2024-04-08T11:00:00Z",
+    "endTime": null,
+    "completed": false,
+    "userId": "user-uuid-2",
+    "userEmail": "another@example.com",
+    "username": "Another Student",
+    "score": null,
+    "totalQuestions": null,
+    "answers": [],
+    "message": "Exam session not completed."
+  }
+}
+```
+Response (Error - Not Found):
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "No exam session found for this user and exam."
+  }
+}
+```
+
+
 ### Delete Exam
 DELETE /api/admin/exams/:examId
 Response:
@@ -206,6 +275,86 @@ Response:
     }
   ]
 }
+```
+
+### Bulk Create Users
+POST /api/admin/users/bulk
+Request:
+```json
+{
+  "users": [
+    {
+      "email": "student1@example.com",
+      "password": "password123",
+      "username": "Student One"
+    },
+    {
+      "email": "student2@example.com",
+      "password": "password456",
+      "username": "Student Two"
+    },
+    {
+      "email": "existing@example.com", // Example of an email that might already exist
+      "password": "password789",
+      "username": "Existing User"
+    },
+    { 
+      "email": "student1@example.com", // Example of duplicate email within the request
+      "password": "passwordabc",
+      "username": "Duplicate Student"
+    },
+    { 
+      "email": "invalid@example.com", // Example of missing field
+      "username": "Invalid User"
+    }
+  ]
+}
+```
+Response (Success):
+```json
+{
+  "data": {
+    "message": "Bulk user creation processed. 2 users created, 3 skipped.",
+    "created": [
+      {
+        "id": "uuid-1",
+        "email": "student1@example.com",
+        "username": "Student One",
+        "createdAt": "2024-04-08T12:00:00Z"
+      },
+      {
+        "id": "uuid-2",
+        "email": "student2@example.com",
+        "username": "Student Two",
+        "createdAt": "2024-04-08T12:00:00Z"
+      }
+    ],
+    "skipped": [
+      {
+        "email": "existing@example.com",
+        "reason": "Email already exists"
+      },
+      {
+        "email": "student1@example.com",
+        "reason": "Email already exists" 
+      },
+      {
+        "email": "invalid@example.com",
+        "reason": "Missing email, password, or username"
+      }
+    ]
+  }
+}
+```
+Response (Error - Invalid Input):
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request body must contain a non-empty \"users\" array."
+  }
+}
+
 ```
 
 # Error Responses

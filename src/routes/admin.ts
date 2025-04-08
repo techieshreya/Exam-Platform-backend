@@ -365,6 +365,119 @@ router.get('/exams/:examId/results', adminAuth, (async (req: AuthRequest, res: R
   }
 }) as unknown as RequestHandler);
 
+// Get specific student's result for an exam
+router.get('/exams/:examId/results/:userId', adminAuth, (async (req: AuthRequest, res: Response) => {
+  try {
+    const { examId, userId } = req.params;
+
+    // Find the specific exam session for this user and exam
+    const [session] = await db.select({
+      sessionId: examSessions.id,
+      startTime: examSessions.startTime,
+      endTime: examSessions.endTime,
+      completed: examSessions.completed,
+      userId: users.id,
+      userEmail: users.email,
+      username: users.username,
+    })
+    .from(examSessions)
+    .leftJoin(users, eq(examSessions.userId, users.id))
+    .where(and(eq(examSessions.examId, examId), eq(examSessions.userId, userId)))
+    .limit(1);
+
+    if (!session) {
+      return res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: 'No exam session found for this user and exam.',
+        },
+      });
+    }
+
+    // If the session wasn't completed, return basic info
+    if (!session.completed) {
+      return res.json({
+        data: {
+          ...session,
+          score: null,
+          totalQuestions: null, // We don't know total questions without fetching them
+          answers: [],
+          message: 'Exam session not completed.',
+        },
+      });
+    }
+
+    // Get all questions for this exam to calculate score and details
+    const examQuestions = await db.select().from(questions)
+      .where(eq(questions.examId, examId));
+
+    // Get the answers submitted by the user in this session
+    const answers = await db.select().from(examAnswers)
+      .where(eq(examAnswers.sessionId, session.sessionId));
+
+    let correctAnswers = 0;
+    const answersWithDetails = await Promise.all(
+      answers.map(async (answer) => {
+        const question = examQuestions.find(q => q.id === answer.questionId);
+        const isCorrect = question?.correctOptionId === answer.selectedOptionId;
+        if (isCorrect) correctAnswers++;
+
+        // Get question text
+        const questionText = question?.text;
+
+        // Get selected option text
+        const [selectedOption] = await db.select({ text: questionOptions.text })
+          .from(questionOptions)
+          .where(eq(questionOptions.id, answer.selectedOptionId))
+          .limit(1);
+
+        // Get correct option text (if different from selected)
+        let correctOptionText = null;
+        if (question?.correctOptionId && !isCorrect) {
+           const [correctOption] = await db.select({ text: questionOptions.text })
+            .from(questionOptions)
+            .where(eq(questionOptions.id, question.correctOptionId))
+            .limit(1);
+            correctOptionText = correctOption?.text;
+        }
+
+
+        return {
+          questionId: answer.questionId,
+          questionText: questionText,
+          selectedOptionId: answer.selectedOptionId,
+          selectedOptionText: selectedOption?.text,
+          correctOptionId: question?.correctOptionId,
+          correctOptionText: isCorrect ? selectedOption?.text : correctOptionText,
+          isCorrect,
+        };
+      })
+    );
+
+    const score = examQuestions.length > 0 ? (correctAnswers / examQuestions.length) * 100 : 0;
+
+    res.json({
+      data: {
+        ...session,
+        score: score,
+        totalQuestions: examQuestions.length,
+        correctAnswers: correctAnswers,
+        answers: answersWithDetails,
+      },
+    });
+
+  } catch (error) {
+    console.error('Get specific student exam result error:', error);
+    res.status(500).json({
+      error: {
+        code: 'SERVER_ERROR',
+        message: 'Error fetching specific student exam result',
+      },
+    });
+  }
+}) as unknown as RequestHandler);
+
+
 // Delete exam
 router.delete('/exams/:examId', adminAuth, (async (req: AuthRequest, res: Response) => {
   try {
@@ -463,5 +576,88 @@ router.get('/users', adminAuth, (async (req: AuthRequest, res: Response) => {
     });
   }
 }) as unknown as RequestHandler);
+
+
+// Bulk Create Users
+router.post('/users/bulk', adminAuth, (async (req: AuthRequest, res: Response) => {
+  try {
+    const usersData = req.body.users; // Expecting { users: [ { email, password, username }, ... ] }
+
+    if (!Array.isArray(usersData) || usersData.length === 0) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Request body must contain a non-empty "users" array.',
+        },
+      });
+    }
+
+    const usersToInsert: (typeof users.$inferInsert)[] = [];
+    const errors: { email: string; reason: string }[] = [];
+    const existingEmails = new Set<string>();
+
+    // Fetch existing emails to avoid duplicates efficiently
+    const allExistingUsers = await db.select({ email: users.email }).from(users);
+    allExistingUsers.forEach(u => existingEmails.add(u.email));
+
+    for (const userData of usersData) {
+      const { email, password, username } = userData;
+
+      // Basic validation for each user
+      if (!email || !password || !username) {
+        errors.push({ email: email || 'N/A', reason: 'Missing email, password, or username' });
+        continue;
+      }
+
+      // Check if email already exists in DB or in the current batch
+      if (existingEmails.has(email)) {
+        errors.push({ email: email, reason: 'Email already exists' });
+        continue;
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      usersToInsert.push({
+        email,
+        password: hashedPassword,
+        username,
+      });
+      existingEmails.add(email); // Add to set to catch duplicates within the request itself
+    }
+
+    // Define the type for the returned user data (excluding password)
+    type CreatedUser = Omit<typeof users.$inferSelect, 'password'>; 
+    let createdUsers: CreatedUser[] = [];
+
+    if (usersToInsert.length > 0) {
+      createdUsers = await db.insert(users).values(usersToInsert).returning({
+        id: users.id,
+        email: users.email,
+        username: users.username,
+        createdAt: users.createdAt,
+      });
+    }
+
+    res.status(201).json({
+      data: {
+        message: `Bulk user creation processed. ${createdUsers.length} users created, ${errors.length} skipped.`,
+        created: createdUsers,
+        skipped: errors,
+      },
+    });
+
+  } catch (error) {
+    console.error('Bulk create users error:', error);
+    // Handle potential database errors during insertion (e.g., unexpected constraint)
+    res.status(500).json({
+      error: {
+        code: 'SERVER_ERROR',
+        message: 'Error processing bulk user creation.',
+      },
+    });
+  }
+}) as unknown as RequestHandler);
+
 
 export default router;
