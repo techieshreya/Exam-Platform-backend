@@ -674,7 +674,7 @@ router.post('/upload-image', adminAuth, upload.single('image'), (async (req: Aut
 
     res.json({
       data: {
-        url: imageUrl,
+        url: `https://unisphere-api.clusterider.tech/${imageUrl}`,
         filename: req.file.filename,
       },
     });
