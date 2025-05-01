@@ -24,6 +24,7 @@ export const questions = pgTable('questions', {
   id: uuid('id').defaultRandom().primaryKey(),
   examId: uuid('exam_id').references(() => exams.id).notNull(),
   text: text('text').notNull(),
+  imageUrls: text('image_urls').array(), // Store multiple image URLs as an array
   correctOptionId: uuid('correct_option_id'),
   createdAt: timestamp('created_at').defaultNow().notNull()
 });

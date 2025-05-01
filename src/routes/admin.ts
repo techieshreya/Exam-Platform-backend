@@ -7,8 +7,46 @@ import { AuthRequest } from '../types/express.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { sendWelcomeEmail } from '../utils/email.js'; // Import the email utility
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 
 const router = Router();
+
+// Configure multer for file storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(process.cwd(), 'uploads', 'images');
+    // Ensure the directory exists
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    // Create a unique filename with timestamp
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+  }
+});
+
+// File filter to allow only images
+const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Not an image! Please upload only images.'));
+  }
+};
+
+const upload = multer({ 
+  storage, 
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  }
+});
 
 // Admin Authentication Routes
 
@@ -125,6 +163,7 @@ router.post('/exams', adminAuth, (async (req: AuthRequest, res: Response) => {
       const [question] = await db.insert(questions).values({
         examId: exam.id,
         text: questionData.text,
+        imageUrls: questionData.imageUrls || [], // Handle image URLs
       }).returning();
 
       const createdOptions = await Promise.all(
@@ -618,5 +657,36 @@ router.post('/users/bulk', adminAuth, (async (req: AuthRequest, res: Response) =
   }
 }) as unknown as RequestHandler);
 
+// Image Upload Route
+router.post('/upload-image', adminAuth, upload.single('image'), (async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'No image file provided',
+        },
+      });
+    }
+
+    // Create URL for the uploaded image
+    const imageUrl = `/uploads/images/${req.file.filename}`;
+
+    res.json({
+      data: {
+        url: imageUrl,
+        filename: req.file.filename,
+      },
+    });
+  } catch (error) {
+    console.error('Image upload error:', error);
+    res.status(500).json({
+      error: {
+        code: 'SERVER_ERROR',
+        message: 'Error uploading image',
+      },
+    });
+  }
+}) as unknown as RequestHandler);
 
 export default router;
