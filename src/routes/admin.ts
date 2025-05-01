@@ -670,11 +670,11 @@ router.post('/upload-image', adminAuth, upload.single('image'), (async (req: Aut
     }
 
     // Create URL for the uploaded image
-    const imageUrl = `/uploads/images/${req.file.filename}`;
+    const imageUrl = `/api/uploads/images/${req.file.filename}`;
 
     res.json({
       data: {
-        url: `https://unisphere-api.clusterider.tech/${imageUrl}`,
+        url: `https://unisphere-api.clusterider.tech${imageUrl}`,
         filename: req.file.filename,
       },
     });
