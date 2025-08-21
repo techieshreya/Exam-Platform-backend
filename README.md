@@ -1,215 +1,280 @@
-# Unisphere Exam Backend
+<p align="center">
+  <a href="#" target="_blank">
+    <img src="https://i.imgur.com/E7v3q4Z.png" alt="Unisphere Logo" width="120">
+  </a>
+</p>
 
-A TypeScript-based Express.js backend for the Unisphere examination system with PostgreSQL database using Drizzle ORM.
+<h1 align="center">Unisphere Exam Platform - Backend</h1>
 
-## Setup
+<p align="center">
+  <strong>A robust and scalable backend for the Unisphere examination system.</strong>
+</p>
 
-1. Install dependencies:
-```bash
-npm install
-```
+<p align="center">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.8.2-blue?style=for-the-badge&logo=typescript">
+  <img alt="Node.js" src="https://img.shields.io/badge/Node.js-22.13.10-green?style=for-the-badge&logo=node.js">
+  <img alt="Express.js" src="https://img.shields.io/badge/Express.js-4.21.2-lightgrey?style=for-the-badge&logo=express">
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-8.14.1-blue?style=for-the-badge&logo=postgresql">
+  <img alt="Drizzle ORM" src="https://img.shields.io/badge/Drizzle%20ORM-0.41.0-green?style=for-the-badge&logo=drizzle">
+</p>
 
-2. Create a `.env` file with the following variables:
-```env
-DATABASE_URL=your_postgres_url
-JWT_SECRET=your_jwt_secret
-PORT=3000
-```
+<p align="center">
+  <a href="#-features">Features</a> •
+  <a href="#-tech-stack">Tech Stack</a> •
+  <a href="#-getting-started">Getting Started</a> •
+  <a href="#-api-documentation">API Documentation</a> •
+  <a href="#-database-schema">Database Schema</a> •
+  <a href="#-contributing">Contributing</a> •
+  <a href="#-license">License</a>
+</p>
 
-3. Set up the database:
-```bash
-npm run db:push    # Create database schema
+---
 
-# Then either:
-npm run db:seed    # Create sample exam via CLI script
-# OR use the API endpoint:
-# POST /api/admin/create-sample-exam
-```
+## ✨ Features
 
-4. Start development server:
-```bash
-npm run dev
-```
+*   **Secure Authentication**: JWT-based authentication for both students and administrators.
+*   **Exam Management**: Create, read, update, and delete exams with questions and options.
+*   **Exam Sessions**: Start, submit, and review exam sessions.
+*   **Automated Grading**: Automatic scoring of exams upon submission.
+*   **User Management**: Manage users and their roles.
+*   **Bulk User Creation**: Easily create multiple user accounts at once.
+*   **Image Uploads**: Support for uploading images for questions.
+*   **Email Notifications**: Automated welcome emails for new users.
+*   **Detailed Results**: In-depth exam results for both students and administrators.
 
-## API Endpoints
+---
 
-### Admin Endpoints
+## 🚀 Tech Stack
 
-#### Create Sample Exam
-```
-POST /api/admin/create-sample-exam
-Headers: {
-  "Authorization": "Bearer {token}"
-}
-Response: {
+*   **Backend**: [Node.js](https://nodejs.org/), [Express.js](https://expressjs.com/), [TypeScript](https://www.typescriptlang.org/)
+*   **Database**: [PostgreSQL](https://www.postgresql.org/)
+*   **ORM**: [Drizzle ORM](https://orm.drizzle.team/)
+*   **Authentication**: [JSON Web Tokens (JWT)](https://jwt.io/)
+*   **Validation**: [express-validator](https://express-validator.github.io/)
+*   **Email**: [Nodemailer](https://nodemailer.com/)
+*   **File Uploads**: [Multer](https://github.com/expressjs/multer)
+
+---
+
+## 🏁 Getting Started
+
+### Prerequisites
+
+*   [Node.js](https://nodejs.org/en/download/) (v18 or higher)
+*   [PostgreSQL](https://www.postgresql.org/download/)
+*   [Bun](https://bun.sh/) (optional, for faster package management)
+
+### Installation
+
+1.  **Clone the repository:**
+
+    ```bash
+    git clone https://github.com/your-username/Exam-Platform-backend.git
+    cd Exam-Platform-backend
+    ```
+
+2.  **Install dependencies:**
+
+    ```bash
+    npm install
+    # or
+    bun install
+    ```
+
+3.  **Set up environment variables:**
+
+    Create a `.env` file in the root directory and add the following variables:
+
+    ```env
+    # Database
+    DATABASE_URL=postgres://user:password@localhost:5432/dbname
+
+    # JWT
+    JWT_SECRET=your-super-secret-jwt-key
+
+    # Server
+    PORT=3000
+
+    # Email (for sending welcome emails)
+    EMAIL=your-email@gmail.com
+    PASSWORD=your-email-password
+    ```
+
+4.  **Set up the database:**
+
+    ```bash
+    # Apply migrations to create the database schema
+    npm run db:push
+    ```
+
+5.  **Start the development server:**
+
+    ```bash
+    npm run dev
+    ```
+
+The server will be running at `http://localhost:3000`.
+
+---
+
+## 📖 API Documentation
+
+The API is documented using a combination of the existing `context.txt` and `context-admin-updated.txt` files. Here is a summary of the available endpoints.
+
+### Response Format
+
+All API responses follow a consistent format:
+
+**Success:**
+
+```json
+{
   "data": {
-    "message": "Sample exam created successfully",
-    "exam": {
-      "id": string,
-      "title": string,
-      "description": string,
-      "duration": number
-    }
+    // ... response data
+  }
+}
+```
+
+**Error:**
+
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "A descriptive error message."
   }
 }
 ```
 
 ### Authentication
 
-#### Register User
-```
-POST /api/auth/register
-Body: {
-  "email": string,
-  "password": string,
-  "username": string
-}
-```
+*   `POST /api/auth/login`: Login as a student.
+*   `GET /api/auth/me`: Get the current user's information.
+*   `POST /api/auth/logout`: Logout the current user.
 
-#### Login
-```
-POST /api/auth/login
-Body: {
-  "email": string,
-  "password": string
-}
-```
+### Admin
 
-#### Get Current User
-```
-GET /api/auth/me
-Headers: {
-  "Authorization": "Bearer {token}"
-}
-```
-
-#### Logout
-```
-POST /api/auth/logout
-Headers: {
-  "Authorization": "Bearer {token}"
-}
-```
+*   `POST /api/admin/login`: Login as an administrator.
+*   `GET /api/admin/exams`: Get a list of all exams.
+*   `POST /api/admin/exams`: Create a new exam.
+*   `GET /api/admin/exams/:examId`: Get details of a specific exam.
+*   `GET /api/admin/exams/:examId/results`: Get results for a specific exam.
+*   `GET /api/admin/exams/:examId/results/:userId`: Get results for a specific student on a specific exam.
+*   `DELETE /api/admin/exams/:examId`: Delete an exam.
+*   `GET /api/admin/users`: Get a list of all users.
+*   `POST /api/admin/users/bulk`: Create multiple users at once.
+*   `POST /api/admin/upload-image`: Upload an image for a question.
 
 ### Exams
 
-#### List Available Exams
-```
-GET /api/exams
-Headers: {
-  "Authorization": "Bearer {token}"
-}
-```
+*   `GET /api/exams`: Get a list of available exams.
+*   `GET /api/exams/results`: Get all exam results for the current user.
+*   `GET /api/exams/:examId`: Get details of a specific exam.
+*   `POST /api/exams/:examId/start`: Start an exam session.
+*   `POST /api/exams/:examId/submit`: Submit an exam.
+*   `GET /api/exams/:examId/results`: Get the results for a specific exam.
 
-#### Get Exam Details
-```
-GET /api/exams/:examId
-Headers: {
-  "Authorization": "Bearer {token}"
-}
-```
+---
 
-#### Start Exam
-```
-POST /api/exams/:examId/start
-Headers: {
-  "Authorization": "Bearer {token}"
-}
-```
+## 🗄️ Database Schema
 
-#### Submit Exam
-```
-POST /api/exams/:examId/submit
-Headers: {
-  "Authorization": "Bearer {token}"
-}
-Body: {
-  "answers": [
-    {
-      "questionId": string,
-      "selectedOptionId": string
+The database schema is designed to be simple and efficient. It consists of the following tables:
+
+*   `admins`: Stores administrator accounts.
+*   `users`: Stores student accounts.
+*   `exams`: Stores exam information.
+*   `questions`: Stores exam questions.
+*   `question_options`: Stores the options for each question.
+*   `exam_sessions`: Stores information about each exam session.
+*   `exam_answers`: Stores the answers submitted by students.
+
+Here is a diagram of the database schema:
+
+```mermaid
+erDiagram
+    admins {
+        uuid id PK
+        text email
+        text password
+        text name
+        timestamp created_at
     }
-  ]
-}
+
+    users {
+        uuid id PK
+        text email
+        text username
+        text password
+        timestamp created_at
+    }
+
+    exams {
+        uuid id PK
+        text title
+        text description
+        integer duration
+        timestamp start_time
+        timestamp end_time
+        timestamp created_at
+    }
+
+    questions {
+        uuid id PK
+        uuid exam_id FK
+        text text
+        text[] image_urls
+        uuid correct_option_id
+        timestamp created_at
+    }
+
+    question_options {
+        uuid id PK
+        uuid question_id FK
+        text text
+        timestamp created_at
+    }
+
+    exam_sessions {
+        uuid id PK
+        uuid exam_id FK
+        uuid user_id FK
+        timestamp start_time
+        timestamp end_time
+        boolean completed
+        timestamp created_at
+    }
+
+    exam_answers {
+        uuid id PK
+        uuid session_id FK
+        uuid question_id FK
+        uuid selected_option_id FK
+        timestamp created_at
+    }
+
+    exams ||--o{ questions : "has"
+    questions ||--o{ question_options : "has"
+    users ||--o{ exam_sessions : "has"
+    exams ||--o{ exam_sessions : "has"
+    exam_sessions ||--o{ exam_answers : "has"
+    questions ||--o{ exam_answers : "has"
+    question_options ||--o{ exam_answers : "has"
 ```
 
-#### Get Exam Results
-```
-GET /api/exams/:examId/results
-Headers: {
-  "Authorization": "Bearer {token}"
-}
-```
+---
 
-#### Get All Results
-```
-GET /api/exams/results
-Headers: {
-  "Authorization": "Bearer {token}"
-}
-```
+## 🤝 Contributing
 
-## Project Structure
+Contributions are welcome! Please feel free to submit a pull request or open an issue.
 
-```
-src/
-├── db/
-│   ├── index.ts        # Database connection
-│   ├── schema.ts       # Database schema definitions
-│   └── migrations/     # Generated migrations
-├── middleware/
-│   └── auth.ts         # Authentication middleware
-├── routes/
-│   ├── admin.ts        # Admin routes
-│   ├── auth.ts         # Authentication routes
-│   └── exams.ts        # Exam routes
-├── scripts/
-│   └── init-data.ts    # Database seeding script
-├── types/
-│   └── express.ts      # Type definitions
-└── index.ts            # Main application entry
-```
+---
 
-## Response Format
+## 📄 License
 
-All API responses follow this format:
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-Success:
-```json
-{
-  "data": {
-    // Response data
-  }
-}
-```
+---
 
-Error:
-```json
-{
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Error message"
-  }
-}
-```
+## 📞 Contact
 
-## Error Codes
-
-- `VALIDATION_ERROR`: Invalid input data
-- `AUTH_ERROR`: Authentication error
-- `NOT_FOUND`: Resource not found
-- `SESSION_EXISTS`: Active exam session already exists
-- `INVALID_TIME`: Exam not available at this time
-- `SESSION_NOT_FOUND`: No active exam session found
-- `RESULTS_NOT_FOUND`: No completed exam session found
-- `SERVER_ERROR`: Internal server error
-
-## Development
-
-- `npm run dev`: Start development server with hot reload
-- `npm run build`: Build for production
-- `npm start`: Start production server
-- `npm run db:generate`: Generate database migrations
-- `npm run db:push`: Push schema changes to database
-- `npm run db:studio`: Open Drizzle Studio
-- `npm run db:seed`: Seed database with sample exam
+If you have any questions or suggestions, feel free to reach out to me at [your-email@example.com](mailto:your-email@example.com).
